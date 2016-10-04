@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 		qs->computeQuickSort(array, 0, array.size() - 1);
 		clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
 		timespec differenceTime = diff(start, stop);
-		cout << differenceTime.tv_sec << "," << differenceTime.tv_nsec << endl;
+		cout << differenceTime.tv_sec << "." << differenceTime.tv_nsec << endl;
 		delete qs;
 	}
 	return 0;
