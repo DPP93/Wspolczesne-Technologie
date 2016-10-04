@@ -82,5 +82,21 @@ local.properties
 # Code Recommenders
 .recommenders/
 
+.metadata
+.settings
+Release/
+Debug/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+
 
 
