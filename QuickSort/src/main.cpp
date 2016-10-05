@@ -7,6 +7,7 @@
 //============================================================================
 
 #include <iostream>
+#include <algorithm>
 #include <vector>
 #include <time.h>
 #include <random>
@@ -52,7 +53,7 @@ int main(int argc, char *argv[]) {
 
 		switch (sortType) {
 		case Sorting_Type::sort_optimistic:
-			setOptymisticElems(array, arraySize, uniqueValues);
+//			setOptymisticElems(array, arraySize, uniqueValues);
 			break;
 		case Sorting_Type::sort_pesymistic:
 			setPesymisticElems(array, arraySize, uniqueValues);
@@ -93,16 +94,33 @@ void setSortType(char type, Sorting_Type& sortType) {
 }
 
 void setPesymisticElems(vector<int>& array, int count, int uniqueValues) {
-
-	for (int i = 1; i <= count; i++) {
-		array.push_back(i);
-	}
-
-}
-
-void setOptymisticElems(vector<int>& array, int count, int uniqueValues) {
-	for (int i = count; i >= 1; i--) {
-		array.push_back(i);
+	if (uniqueValues < 1) {
+		for (int i = 1; i <= count; i++) {
+			array.push_back(i);
+		}
+	} else {
+		random_device rd;
+		mt19937 gen(rd());
+		uniform_int_distribution<> dis(-500, 500);
+		vector<int> uniques { };
+		for (int i = 0; i < uniqueValues; i++) {
+			bool end = false;
+			while (!end) {
+				int x = dis(gen);
+				auto it = find(uniques.begin(), uniques.end(), x);
+				if (it == uniques.end()) {
+					uniques.push_back(x);
+					end = true;
+				}
+			}
+		}
+		int last = static_cast<int>(uniques.size()) - 1;
+		uniform_int_distribution<> d(0, last);
+		for (int i = 0; i < count; i++) {
+			int x = d(gen);
+			array.push_back(uniques[x]);
+		}
+		sort(array.begin(), array.end());
 	}
 }
 
@@ -110,21 +128,43 @@ void setRandomElems(vector<int>&array, int count, int uniqueValues) {
 	random_device rd;
 	mt19937_64 gen(rd());
 	uniform_int_distribution<> dis(1, count);
-	for (int i = 1; i <= count; i++) {
-		int x = dis(gen);
-		array.push_back(x);
+
+	if (uniqueValues < 1) {
+		for (int i = 1; i <= count; i++) {
+			int x = dis(gen);
+			array.push_back(x);
+		}
+	} else {
+		vector<int> uniques { };
+		for (int i = 0; i < uniqueValues; i++) {
+			bool end = false;
+			while (!end) {
+				int x = dis(gen);
+				auto it = find(uniques.begin(), uniques.end(), x);
+				if (it == uniques.end()) {
+					uniques.push_back(x);
+					end = true;
+				}
+			}
+		}
+		int last = static_cast<int>(uniques.size()) - 1;
+		uniform_int_distribution<> d(0, last);
+		for (int i = 0; i < count; i++) {
+			int x = d(gen);
+			array.push_back(uniques[x]);
+		}
+		shuffle(array.begin(), array.end(), gen);
 	}
 }
 
-timespec diff(timespec start, timespec end)
-{
+timespec diff(timespec start, timespec end) {
 	timespec temp;
-	if ((end.tv_nsec-start.tv_nsec)<0) {
-		temp.tv_sec = end.tv_sec-start.tv_sec-1;
-		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+	if ((end.tv_nsec - start.tv_nsec) < 0) {
+		temp.tv_sec = end.tv_sec - start.tv_sec - 1;
+		temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
 	} else {
-		temp.tv_sec = end.tv_sec-start.tv_sec;
-		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+		temp.tv_sec = end.tv_sec - start.tv_sec;
+		temp.tv_nsec = end.tv_nsec - start.tv_nsec;
 	}
 	return temp;
 }
