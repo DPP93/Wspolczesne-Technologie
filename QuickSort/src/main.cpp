@@ -101,7 +101,7 @@ void setPesymisticElems(vector<int>& array, int count, int uniqueValues) {
 	} else {
 		random_device rd;
 		mt19937 gen(rd());
-		uniform_int_distribution<> dis(-500, 500);
+		uniform_int_distribution<> dis(-numeric_limits<int>::max(), numeric_limits<int>::max());
 		vector<int> uniques { };
 		for (int i = 0; i < uniqueValues; i++) {
 			bool end = false;
@@ -127,7 +127,7 @@ void setPesymisticElems(vector<int>& array, int count, int uniqueValues) {
 void setRandomElems(vector<int>&array, int count, int uniqueValues) {
 	random_device rd;
 	mt19937_64 gen(rd());
-	uniform_int_distribution<> dis(1, count);
+	uniform_int_distribution<> dis(-numeric_limits<int>::max(), numeric_limits<int>::max());
 
 	if (uniqueValues < 1) {
 		for (int i = 1; i <= count; i++) {
