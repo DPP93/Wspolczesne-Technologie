@@ -19,7 +19,6 @@ using namespace std;
 
 void setSortType(char type, Sorting_Type& sortType);
 void setPesymisticElems(vector<int>& array, int count, int uniqueValues);
-void setOptymisticElems(vector<int>& array, int count, int uniqueValues);
 void setRandomElems(vector<int>&array, int count, int uniqueValues);
 timespec diff(timespec start, timespec end);
 
@@ -52,9 +51,6 @@ int main(int argc, char *argv[]) {
 		array.clear();
 
 		switch (sortType) {
-		case Sorting_Type::sort_optimistic:
-//			setOptymisticElems(array, arraySize, uniqueValues);
-			break;
 		case Sorting_Type::sort_pesymistic:
 			setPesymisticElems(array, arraySize, uniqueValues);
 			break;
