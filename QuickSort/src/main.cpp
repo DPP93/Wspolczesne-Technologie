@@ -74,10 +74,6 @@ int main(int argc, char *argv[]) {
 
 void setSortType(char type, Sorting_Type& sortType) {
 	switch (type) {
-	case 'O':
-	case 'o':
-		sortType = Sorting_Type::sort_optimistic;
-		break;
 	case 'P':
 	case 'p':
 		sortType = Sorting_Type::sort_pesymistic;
