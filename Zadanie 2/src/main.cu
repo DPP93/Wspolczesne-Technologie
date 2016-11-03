@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 	delete[] res;
 
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-	computeOnGPU<<<N*N, N>>>(gpuMatrix, gpuVector, gpuResult, gpuN);
+	computeOnGPU<<<N, 1>>>(gpuMatrix, gpuVector, gpuResult, gpuN);
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
 	differenceTime = diff(start, stop);
 	std::cout << "GPU " << differenceTime.tv_sec << "." << differenceTime.tv_nsec << std::endl;
@@ -140,14 +140,16 @@ double* computeOnCPU(double* matrix, double* vector, int N) {
 
 __global__ void computeOnGPU(double* matrix, double* vector, double* result,
 		int* N) {
-	int row = blockIdx.y * blockDim.y + threadIdx.y;
-	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	int col = blockIdx.y * blockDim.y + threadIdx.y;
+	int row = blockIdx.x * blockDim.x + threadIdx.x;
 
 	int elems = *N;
 
 	if (row < elems && col < elems) {
-		result[row] += (matrix[col + row*elems] * vector[row]);
+		result[row] += (matrix[col + row*elems] * vector[col]);
 	}
+
+	__syncthreads();
 }
 
 timespec diff(timespec start, timespec end) {
