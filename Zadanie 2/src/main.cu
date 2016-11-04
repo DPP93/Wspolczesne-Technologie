@@ -4,15 +4,33 @@
 #include <string>
 #include <sstream>
 #include <time.h>
+#include <cstdio>
 
 using namespace std;
 
-double* generateMatrix(int N, double min, double max);
-double* generateVector(int N, double min, double max);
+int calcGridValue(int value);
 double* computeOnCPU(double* matrix, double* vector, int N);
 timespec diff(timespec start, timespec end);
-__global__ void computeOnGPU(double* matrix, double* vector, double* result,
-		int* N);
+
+__global__ void computeOnGPU(double* matrix, double* vector, double* result, size_t pitch,
+		int* N) {
+
+//	int x = blockIdx.x * blockDim.x + threadIdx.x;
+//	int y = blockIdx.y * blockDim.y + threadIdx.y;
+//
+//	if (x < *N && y < *N) {
+//		printf("Matrix val %d for %d %d\n", (matrix[y + x*pitch]), x, y);
+//		printf("Vector val %d\n", (vector[x]));
+//		result[x] += (matrix[y + x*pitch] * vector[x]);
+//	}
+
+	for (int x = 0; x < *N; ++x) {
+		for (int y = 0; y < *N; ++y) {
+			printf("Matrix val %d ", (matrix[y + x*(*N)]));
+		}
+		printf("\n");
+	}
+}
 
 int main(int argc, char* argv[]) {
 	srand (time(NULL));
@@ -27,15 +45,22 @@ int main(int argc, char* argv[]) {
 	min = stof(s2);
 	max = stof(s3);
 
-	int doubleSize = sizeof(double);
+	double matrix[N][N];
+	double vector[N];
+	double cpuReturnVector[N];
+	double gpuReturnVector[N];
 
-	double* matrix = generateMatrix(N, min, max);
-	double* vector = generateVector(N, min, max);
+	for (int x = 0; x < N; ++x) {
+		for (int y = 0; y < N; ++y) {
+			matrix[x][y]= (min + (rand() % (int) (max - min + 1)));
+		}
+		vector[x] = (min + (rand() % (int) (max - min + 1)));
+	}
 
 	cout << "Matrix" << endl;
 	for (int x = 0; x < N; ++x) {
 		for (int y = 0; y < N; ++y) {
-			cout << matrix[y + x*N] << " ";
+			cout << matrix[x][y] << " ";
 		}
 		cout << endl;
 	}
@@ -45,85 +70,94 @@ int main(int argc, char* argv[]) {
 		cout << vector[x] << endl;
 	}
 
-	double* gpu = new double[N];
-	for (int i = 0; i < N; ++i) {
-		gpu[i] = 0;
-	}
-
-	double* gpuMatrix;
-	double* gpuVector;
-	double* gpuResult;
-	int* gpuN;
-
-	cudaMalloc((void**) &gpuMatrix, N*N*doubleSize);
-	cudaMalloc((void**) &gpuVector, N*doubleSize);
-	cudaMalloc((void**) &gpuResult, N*doubleSize);
-	cudaMalloc((void**) &gpuN, sizeof(int));
-
-	cudaMemcpy(gpuMatrix, matrix, N*N*doubleSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(gpuVector, vector, N*doubleSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(gpuResult, gpu, N*doubleSize, cudaMemcpyHostToDevice);
-	cudaMemcpy(gpuN, &N, sizeof(int), cudaMemcpyHostToDevice);
-
 	timespec start, stop;
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-	double* res = computeOnCPU(matrix, vector, N);
-	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
-	timespec differenceTime = diff(start, stop);
-	std::cout << "CPU " << differenceTime.tv_sec << "." << differenceTime.tv_nsec << std::endl;
-
-	cout << "CPU" << endl;
-	for (int i = 0; i < N; ++i) {
-		cout << res[i] << endl;
-	}
-
-	delete[] res;
+	timespec returnTime;
 
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-	computeOnGPU<<<N, 1>>>(gpuMatrix, gpuVector, gpuResult, gpuN);
+	for (int x = 0; x < N; ++x) {
+		cpuReturnVector[x] = 0;
+		double sum = 0;
+		for (int y = 0; y < N; ++y) {
+			sum += vector[x] * matrix[x][y];
+		}
+		cpuReturnVector[x] = sum;
+	}
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
-	differenceTime = diff(start, stop);
-	std::cout << "GPU " << differenceTime.tv_sec << "." << differenceTime.tv_nsec << std::endl;
+	returnTime = diff(start, stop);
+	cout << "CPU TIME: " << returnTime.tv_sec<<"."<<returnTime.tv_nsec<< endl;
 
+	//Tu zaczyna się CUDO-wanie
 
-	cudaMemcpy(gpu, gpuResult, N*doubleSize, cudaMemcpyDeviceToHost);
+	//Ogarniane jest tutaj ile dana karta może wytrzymać wątków na jeden blok
+	cudaDeviceProp devProp;
+	cudaGetDeviceProperties(&devProp, 0);
+	int maxThreadsPerBlock = devProp.maxThreadsPerBlock;
 
-	cout << "GPU" << endl;
-	for (int i = 0; i < N; ++i) {
-		cout << gpu[i] << endl;
+	//Tu obliczana jest potrzebna liczba wątków
+	int numberOfBlocks = (N*N) / maxThreadsPerBlock;
+	if ((N*N) % maxThreadsPerBlock) {
+		numberOfBlocks++;
 	}
 
-	delete[] gpu;
-	delete[] matrix;
-	delete[] vector;
 
-	cudaFree(gpuMatrix);
-	cudaFree(gpuVector);
-	cudaFree(gpuResult);
-	cudaFree(gpuN);
+	//Poalokowane coby sobie nie robić problemów przy alokacji rozmiarów na karcie graficznej
+	size_t doubleSize = sizeof(double);
+	size_t sizeOfMatrix = N*N*doubleSize;
+	size_t sizeOfVector = N*doubleSize;
+
+	//Przedrostek d_ oznacza, że dana zmienna wykorzystywana jest nie na procku, ale na karcie
+	double * d_matrix;
+	double * d_vector;
+	double * d_result;
+	int* d_N;
+	/*To je takie fajne cuś, co da info podczas alokowania pamięci na karcie, ile jest 'komórek'
+	 *  pamięci w wierszu
+	 */
+	size_t d_pitch;
+
+	//Zaalokuj pamięć na karcie na wektor do mnożenia
+	cudaMalloc(&d_vector, sizeOfVector);
+	//Skopiuj dane z pamięci komputra na pamięć karty graficznej
+	cudaMemcpy(d_vector, &vector, sizeOfVector, cudaMemcpyHostToDevice);
+
+	cudaMalloc(&d_result, sizeOfVector);
+
+	cudaMalloc(&d_N, sizeof(int));
+	cudaMemcpy(d_N, &N, sizeof(int), cudaMemcpyHostToDevice);
+	//Tutaj to samo tylko robimy to jakby dwuwymiarowo
+	cudaMallocPitch(&d_matrix, &d_pitch, N * doubleSize, N);
+	cudaMemcpy2D(d_matrix, d_pitch, matrix, N, N * doubleSize, N, cudaMemcpyHostToDevice);
+
+	dim3 block (numberOfBlocks, numberOfBlocks);
+	dim3 grid (calcGridValue(N/block.x), calcGridValue(N/block.y));
+
+
+	cout << "Blocks: " << block.x << " " << block.y << " " << block.z << endl;
+	cout << "Grid: " << grid.x << " " << grid.y << " " << grid.z << endl;
+
+	clock_t calcGpuStart = clock();
+
+	computeOnGPU<<<grid, block>>> (d_matrix, d_vector, d_result, d_pitch, d_N);
+
+	cout<<"GPU time: " << ((clock() - calcGpuStart) / (double)(CLOCKS_PER_SEC / 1000)) <<endl;
+
+	cudaDeviceSynchronize();
+	cudaMemcpy2D(gpuReturnVector, N * sizeof(int), d_result, d_pitch, N * sizeof(int), N, cudaMemcpyDeviceToHost);
+
+	cout << "Vector" << endl;
+	for (int x = 0; x < N; ++x) {
+		cout << gpuReturnVector[x] << endl;
+	}
+
+	cudaFree(d_matrix);
+	cudaFree(d_vector);
+	cudaFree(d_result);
+	cudaFree(d_N);
+	cudaDeviceReset();
 
 	return 0;
 }
 
-double* generateMatrix(int N, double min, double max) {
-	double * returnArray = new double[N*N];
-
-	for (int x = 0; x < N; ++x) {
-		for (int y = 0; y < N; ++y) {
-			returnArray[y + x*N] = (min + (rand() % (int) (max - min + 1)));
-		}
-	}
-	return returnArray;
-}
-
-double* generateVector(int N, double min, double max) {
-	double * returnArray = new double[N];
-
-	for (int x = 0; x < N; ++x) {
-		returnArray[x] = (min + (rand() % (int) (max - min + 1)));
-	}
-	return returnArray;
-}
 
 double* computeOnCPU(double* matrix, double* vector, int N) {
 
@@ -138,19 +172,7 @@ double* computeOnCPU(double* matrix, double* vector, int N) {
 	return returnVector;
 }
 
-__global__ void computeOnGPU(double* matrix, double* vector, double* result,
-		int* N) {
-	int col = blockIdx.y * blockDim.y + threadIdx.y;
-	int row = blockIdx.x * blockDim.x + threadIdx.x;
 
-	int elems = *N;
-
-	if (row < elems && col < elems) {
-		result[row] += (matrix[col + row*elems] * vector[col]);
-	}
-
-	__syncthreads();
-}
 
 timespec diff(timespec start, timespec end) {
 	timespec temp;
@@ -162,4 +184,13 @@ timespec diff(timespec start, timespec end) {
 		temp.tv_nsec = end.tv_nsec - start.tv_nsec;
 	}
 	return temp;
+}
+
+int calcGridValue(int value) {
+	if (value % 2 == 0) {
+		return value;
+	}
+	else {
+		return value + 1;
+	}
 }
