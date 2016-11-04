@@ -15,21 +15,21 @@ timespec diff(timespec start, timespec end);
 __global__ void computeOnGPU(double* matrix, double* vector, double* result, size_t pitch,
 		int* N) {
 
-//	int x = blockIdx.x * blockDim.x + threadIdx.x;
-//	int y = blockIdx.y * blockDim.y + threadIdx.y;
-//
-//	if (x < *N && y < *N) {
-//		printf("Matrix val %d for %d %d\n", (matrix[y + x*pitch]), x, y);
-//		printf("Vector val %d\n", (vector[x]));
-//		result[x] += (matrix[y + x*pitch] * vector[x]);
-//	}
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	for (int x = 0; x < *N; ++x) {
-		for (int y = 0; y < *N; ++y) {
-			printf("Matrix val %d ", (matrix[y + x*(*N)]));
-		}
-		printf("\n");
+	if (x < *N && y < *N) {
+		printf("Matrix val %d for %d %d\n", (matrix[y + x*pitch]), x, y);
+		printf("Vector val %d\n", (vector[x]));
+		result[x] = (matrix[y + x*pitch] * vector[x]);
 	}
+
+//	for (int x = 0; x < *N; ++x) {
+//		for (int y = 0; y < *N; ++y) {
+//			printf("Matrix val %d ", (matrix[y + x*(*N)]));
+//		}
+//		printf("\n");
+//	}
 }
 
 int main(int argc, char* argv[]) {
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
 	double matrix[N][N];
 	double vector[N];
 	double cpuReturnVector[N];
-	double gpuReturnVector[N];
+	double gpuReturnVector[N][N];
 
 	for (int x = 0; x < N; ++x) {
 		for (int y = 0; y < N; ++y) {
@@ -120,12 +120,11 @@ int main(int argc, char* argv[]) {
 	//Skopiuj dane z pamięci komputra na pamięć karty graficznej
 	cudaMemcpy(d_vector, &vector, sizeOfVector, cudaMemcpyHostToDevice);
 
-	cudaMalloc(&d_result, sizeOfVector);
-
 	cudaMalloc(&d_N, sizeof(int));
 	cudaMemcpy(d_N, &N, sizeof(int), cudaMemcpyHostToDevice);
 	//Tutaj to samo tylko robimy to jakby dwuwymiarowo
 	cudaMallocPitch(&d_matrix, &d_pitch, N * doubleSize, N);
+	cudaMallocPitch(&d_result, &d_pitch, N * doubleSize, N);
 	cudaMemcpy2D(d_matrix, d_pitch, matrix, N, N * doubleSize, N, cudaMemcpyHostToDevice);
 
 	dim3 block (numberOfBlocks, numberOfBlocks);
@@ -146,7 +145,10 @@ int main(int argc, char* argv[]) {
 
 	cout << "Vector" << endl;
 	for (int x = 0; x < N; ++x) {
-		cout << gpuReturnVector[x] << endl;
+		for (int y = 0; y < N; ++y) {
+			cout << gpuReturnVector[x][y] << " ";
+		}
+		cout << endl;
 	}
 
 	cudaFree(d_matrix);
