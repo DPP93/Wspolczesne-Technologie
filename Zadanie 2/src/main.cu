@@ -21,7 +21,7 @@ __global__ void computeOnGPU(double* matrix, double* vector, double* result, siz
 	if (x < *N && y < *N) {
 		printf("Matrix val %d for %d %d\n", (matrix[y + x*pitch]), x, y);
 		printf("Vector val %d\n", (vector[x]));
-		result[x] = (matrix[y + x*pitch] * vector[x]);
+		result[x + y*pitch] = (matrix[x + y*pitch] * vector[y]);
 	}
 
 //	for (int x = 0; x < *N; ++x) {
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
 	//Tutaj to samo tylko robimy to jakby dwuwymiarowo
 	cudaMallocPitch(&d_matrix, &d_pitch, N * doubleSize, N);
 	cudaMallocPitch(&d_result, &d_pitch, N * doubleSize, N);
-	cudaMemcpy2D(d_matrix, d_pitch, matrix, N, N * doubleSize, N, cudaMemcpyHostToDevice);
+	cudaMemcpy2D(d_matrix, d_pitch, matrix, N * doubleSize, N * doubleSize, N, cudaMemcpyHostToDevice);
 
 	dim3 block (numberOfBlocks, numberOfBlocks);
 	dim3 grid (calcGridValue(N/block.x), calcGridValue(N/block.y));
