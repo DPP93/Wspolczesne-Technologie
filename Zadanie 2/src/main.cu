@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
 	}
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
 	returnTime = diff(start, stop);
-	cout << "CPU TIME: " << returnTime.tv_sec<<"."<<returnTime.tv_nsec<< endl;
+	cout << "CPU TIME: " << returnTime.tv_sec<<"."<<returnTime.tv_nsec << "s"<< endl;
 
 //	cout << "Cpu Result" << endl;
 //	for (int x = 0; x < N; ++x) {
