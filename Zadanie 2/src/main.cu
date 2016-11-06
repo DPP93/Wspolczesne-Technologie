@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <random>
 #include <ctime>
 #include <string>
@@ -60,7 +61,8 @@ void solveOnCPU(int* matrix, int* vector, int* returnVector, int height, int wid
 
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
 	returnTime = diff(start, stop);
-	cout << "CPU time: " << returnTime.tv_sec << "." << returnTime.tv_nsec << "s" << endl;
+	cout << "CPU time: " << returnTime.tv_sec << "." 
+         << setfill('0') << setw(9) << returnTime.tv_nsec << "s" << endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -162,19 +164,18 @@ int main(int argc, char* argv[]) {
 	cudaEvent_t cudaStart, cudaStop;
 	cudaEventCreate(&cudaStart);
 	cudaEventCreate(&cudaStop);
-	clock_t calcGpuStart = clock();
-	cudaEventRecord(cudaStart);
 
+	cudaEventRecord(cudaStart);
 	computeOnGPU<<<block, thread>>> (d_matrix, d_vector, d_result, d_height, d_width, d_pitch);
+	cudaEventRecord(cudaStop);
+
 	//Poczekać na zakończenie wszystkiego
 	cudaDeviceSynchronize();
 
-	cudaEventRecord(cudaStop);
 	cudaEventSynchronize(cudaStop);
-
 	float milliseconds = 0;
 	cudaEventElapsedTime(&milliseconds, cudaStart, cudaStop);
-	cout << "GPU time: " << milliseconds << "ms" <<endl;
+	cout << "GPU time: " << milliseconds << "ms" << endl;
 
 	cudaMemcpy(gpuReturnVector, d_result, sizeOfResult, cudaMemcpyDeviceToHost);
 
