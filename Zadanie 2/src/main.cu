@@ -85,18 +85,26 @@ int main(int argc, char* argv[]) {
 	min = stof(s2);
 	max = stof(s3);
 
-	int matrix[height][width];
-	int vector[width];
-	int cpuReturnVector[height];
-	int gpuReturnVector[height];
+	int* matrix;//[height][width];
+	int* vector = new int[width];//[width];
+	int* cpuReturnVector = new int[height];//[height];
+	int* gpuReturnVector = new int [height]; //[height];
 
-    generateRandomData(matrix[0], vector, height, width, min, max);
+	matrix = new int[height*width];
+//	for (int i = 0; i < height; ++i) {
+//		matrix[i] = new int[width];
+//		for (int j = 0; j < width; ++j) {
+//			matrix[i][j] = 0;
+//		}
+//	}
+
+    generateRandomData(matrix, vector, height, width, min, max);
     for (int y = 0; y < height; ++y) {
         cpuReturnVector[y] = 0;
         gpuReturnVector[y] = 0;
     }
 
-    solveOnCPU(matrix[0], vector, cpuReturnVector, height, width);
+    solveOnCPU(matrix, vector, cpuReturnVector, height, width);
 
     //solveOnGPU(matrix[0], vector, gpuReturnVector, height, width);
 
@@ -195,6 +203,15 @@ int main(int argc, char* argv[]) {
             ++allOk;
         }
   	}
+
+//  	for (int i = 0; i < height; ++i){
+//  		delete[] matrix[i];
+//  	}
+  	delete [] matrix;
+  	delete [] vector;
+	delete [] cpuReturnVector;
+	delete [] gpuReturnVector;
+
 	return allOk;
 }
 
