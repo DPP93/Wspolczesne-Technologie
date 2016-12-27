@@ -31,7 +31,7 @@ const double maxStartedPositionValue = 10.0;
 const double maxStartedWeightValue = 10.0;
 const double maxStartedVelocityValue = 15.0;
 
-const double timeDifference = 0.0001;
+const double timeDifference = 0.0000001;
 
 using namespace std;
 
@@ -72,7 +72,7 @@ __global__ void universeUpdateVelocity(int* N, physic_body* tab) {
 
 	index = blockIdx.x * blockDim.x + threadIdx.x;
 
-	printf("GPU Body %d index \n", index);
+//	printf("GPU Body %d index \n", index);
 
 	if (index < (*N)) {
 		double solution = 0;
@@ -88,11 +88,11 @@ __global__ void universeUpdateVelocity(int* N, physic_body* tab) {
 
 			solution += (tab[j].m / (pow(dist, 3))) * dist;
 		}
-		printf("GPU Body %d velocity: %lf \n", index, tab[index].v);
-		printf("GPU Body %d velocity changing by: %lf \n", index,
-				tab[index].v + G * solution * timeDifference);
+//		printf("GPU Body %d velocity: %lf \n", index, tab[index].v);
+//		printf("GPU Body %d velocity changing by: %lf \n", index,
+//				tab[index].v + G * solution * timeDifference);
 		tab[index].v = tab[index].v + G * solution * timeDifference;
-		printf("GPU Body %d velocity changed to %lf \n", index, tab[index].v);
+//		printf("GPU Body %d velocity changed to %lf \n", index, tab[index].v);
 
 	}
 }
@@ -102,13 +102,13 @@ __global__ void universeUpdatePosition(int* N, physic_body* tab) {
 	index = threadIdx.x + blockDim.x * blockIdx.x;
 
 	if (index < (*N)) {
-		printf("GPU Body %d position before: %lf %lf %lf \n", index, tab[index].r.x,
-				tab[index].r.y, tab[index].r.z);
+//		printf("GPU Body %d position before: %lf %lf %lf \n", index, tab[index].r.x,
+//				tab[index].r.y, tab[index].r.z);
 		tab[index].r.x = tab[index].r.x + tab[index].v * timeDifference;
 		tab[index].r.y = tab[index].r.y + tab[index].v * timeDifference;
 		tab[index].r.z = tab[index].r.z + tab[index].v * timeDifference;
-		printf("GPU Body %d position changed to: %lf %lf %lf \n", index,
-				tab[index].r.x, tab[index].r.y, tab[index].r.z);
+//		printf("GPU Body %d position changed to: %lf %lf %lf \n", index,
+//				tab[index].r.x, tab[index].r.y, tab[index].r.z);
 	}
 }
 
@@ -133,10 +133,18 @@ int main(int argc, char* argv[]) {
 	copy(cpuBodies, cpuBodies + N, gpuBodies);
 //	generateBodyValues(gpuBodies, N);
 
-	cout << "G" << G << endl;
+	cout << "G " << G << endl;
+
+	timespec start, stop;
+	timespec returnTime;
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 
 	computeOnCPU(cpuBodies, N, iterations);
 
+	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
+	returnTime = diff(start, stop);
+	cout << "CPU time: " << returnTime.tv_sec << "." << setfill('0') << setw(9)
+			<< returnTime.tv_nsec << "s" << endl;
 //NOW CUDA
 
 //Ogarniane jest tutaj ile dana karta może wytrzymać wątków na jeden blok
@@ -168,10 +176,30 @@ int main(int argc, char* argv[]) {
 	cudaMalloc(&d_N, sizeof(int));
 	cudaMemcpy(d_N, &N, sizeof(int), cudaMemcpyHostToDevice);
 
+	cudaEvent_t cudaStart, cudaStop;
+	cudaEventCreate(&cudaStart);
+	cudaEventCreate(&cudaStop);
+
+	float milliseconds = 0;
+
+	cudaEventRecord(cudaStart);
+
 	for (int iteration = 0; iteration < iterations; ++iteration) {
 		universeUpdateVelocity<<< block , thread >>>(d_N, d_tab);
 		universeUpdatePosition<<< block, thread >>>(d_N, d_tab);
 	}
+
+	cudaEventRecord(cudaStop);
+	cudaEventSynchronize(cudaStop);
+	cudaEventElapsedTime(&milliseconds, cudaStart, cudaStop);
+	cudaEventRecord(cudaStop);
+
+	cudaEventSynchronize(cudaStop);
+	//Poczekam na zakoñczenie wszystkiego
+	cudaDeviceSynchronize();
+	cudaEventElapsedTime(&milliseconds, cudaStart, cudaStop);
+
+	cout << "GPU time: " << milliseconds << "ms" << endl;
 
 	cudaMemcpy(gpuBodies, d_tab, sizeOfTab, cudaMemcpyDeviceToHost);
 
@@ -233,7 +261,7 @@ double computeDistance(position positionA, position positionB) {
 
 void computeOnCPU(physic_body* bodies, int N, int iterations) {
 	for (int iter = 0; iter < iterations; ++iter) {
-		printf("Iteration %d \n", iter + 1);
+//		printf("Iteration %d \n", iter + 1);
 		//Change velocity
 //		printf ("Updating velocity\n");
 		for (int i = 0; i < N; ++i) {
@@ -245,8 +273,8 @@ void computeOnCPU(physic_body* bodies, int N, int iterations) {
 				double dist = computeDistance(bodies[i].r, bodies[j].r);
 				solution += (bodies[j].m / (pow(dist, 3))) * dist;
 			}
-			printf ("Body %d velocity: %lf \n", i, bodies[i].v);
-			printf ("Body %d velocity changing by: %lf \n", i, bodies[i].v + G * solution * timeDifference);
+//			printf ("Body %d velocity: %lf \n", i, bodies[i].v);
+//			printf ("Body %d velocity changing by: %lf \n", i, bodies[i].v + G * solution * timeDifference);
 			bodies[i].v = bodies[i].v + G * solution * timeDifference;
 //			printf("Body %d velocity changed to %lf \n", i, bodies[i].v);
 		}
@@ -254,12 +282,12 @@ void computeOnCPU(physic_body* bodies, int N, int iterations) {
 		//Change position
 //		printf ("Updating position\n");
 		for (int i = 0; i < N; ++i) {
-			printf ("Body %d position: %lf %lf %lf \n", i, bodies[i].r.x, bodies[i].r.y, bodies[i].r.z);
+//			printf ("Body %d position: %lf %lf %lf \n", i, bodies[i].r.x, bodies[i].r.y, bodies[i].r.z);
 			bodies[i].r.x = bodies[i].r.x + bodies[i].v * timeDifference;
 			bodies[i].r.y = bodies[i].r.y + bodies[i].v * timeDifference;
 			bodies[i].r.z = bodies[i].r.z + bodies[i].v * timeDifference;
-			printf("Body %d position changed to: %lf %lf %lf \n", i,
-					bodies[i].r.x, bodies[i].r.y, bodies[i].r.z);
+//			printf("Body %d position changed to: %lf %lf %lf \n", i,
+//					bodies[i].r.x, bodies[i].r.y, bodies[i].r.z);
 		}
 	}
 }
