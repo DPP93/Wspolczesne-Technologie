@@ -19,43 +19,22 @@
 
 using namespace std;
 
-__global__ void bubble(int* N, int* tab)
-{
-	int ind, i, j, s;
-	int a, b;
-	ind = 2 * (threadIdx.x + blockDim.x*blockIdx.x);
-	printf("%d\n", ind);
-	for (int k = 0; k<(*N) - 1; k++)
-	{
-
-		s = (k % 2);
-		i = ind + s;
-		j = ind + 1 + s;
-		if (j < (*N))
-		{
-			a = tab[i];
-			b = tab[j];
-			if (b<a)
-			{
-				tab[i] = b;
-				tab[j] = a;
-			}
-		}
-		__syncthreads();
-	}
-}
-
-__global__ void bubble1(int* N, int* s, int* tab) {
+__global__ void bubble(int* N, int *s, int* tab) {
 	int ind, i, j;
 	int a, b;
-	ind = 2 * (threadIdx.x + blockDim.x*blockIdx.x);
-	i = ind + (*s);
-	j = ind + (*s) + 1;
 
-	if (j < (*N)) {
+	ind = 2 * (threadIdx.x + blockDim.x * blockIdx.x);
+	i = ind + (*s);
+	j = (ind + (*s) + 1) % (*N);
+
+	if (i < (*N)) {
+		if (j < i) {
+			int t = i;
+			i = j;
+			j = t;
+		}
 		a = tab[i];
 		b = tab[j];
-
 		if (b < a) {
 			tab[i] = b;
 			tab[j] = a;
@@ -67,8 +46,7 @@ timespec diff(timespec start, timespec end);
 void generateRandomData(int* tab, int N, int min, int max);
 void computeBubbleOnCPU(int* tab, int N);
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
 	srand(time(NULL));
 
 	string s(argv[1]);
@@ -98,7 +76,6 @@ int main(int argc, char* argv[])
 
 	computeBubbleOnCPU(tabCPU, N);
 
-
 	clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop);
 	returnTime = diff(start, stop);
 	cout << "CPU time: " << returnTime.tv_sec << "."
@@ -108,20 +85,13 @@ int main(int argc, char* argv[])
     int minGridSize;
     int blockSize;
     cudaOccupancyMaxPotentialBlockSize(
-            &minGridSize, &blockSize, (void*)bubble, 0, N
+            &minGridSize, &blockSize, (void*)bubble, 0, N / 2
     );
 
-    int blockHeight = blockSize;
-    int blockWidth = 1;
-    while (blockHeight > blockWidth) {
-        blockHeight /= 2;
-        blockWidth *= 2;
-    }
+    int gridSize = (N / 2 + blockSize - 1) / blockSize;
 
-    int gridWidth = (N + blockWidth - 1) / blockWidth;
-
-	dim3 thread (blockWidth);
-	dim3 block (gridWidth);
+	dim3 thread (blockSize);
+	dim3 block (gridSize);
 
 	//Poalokowane coby sobie nie robiæ problemów przy alokacji rozmiarów na karcie graficznej
 	size_t intSize = sizeof(int);
@@ -145,31 +115,29 @@ int main(int argc, char* argv[])
 	cout << "Block: " << block.x << " " << block.y << " " << block.z << endl;
 	cout << "Thread: " << thread.x << " " << thread.y << " " << thread.z << endl;
 
-//	bubble <<< block, thread>>> (d_N, d_tab);
-
-
 	cudaEvent_t cudaStart, cudaStop;
 	cudaEventCreate(&cudaStart);
 	cudaEventCreate(&cudaStop);
 
-	float milliseconds = 0, temp = 0;
+	float milliseconds = 0;
 
+	cudaEventRecord(cudaStart);
 
 	for (int i = 0; i < N - 1; ++i) {
 		int k = (i%2);
 		cudaMemcpy(d_s, &k, sizeof(int), cudaMemcpyHostToDevice);
-		cudaEventRecord(cudaStart);
-		bubble1 <<< block, thread >>>(d_N, d_s, d_tab);
-		cudaEventRecord(cudaStop);
-		cudaEventSynchronize(cudaStop);
-		cudaEventElapsedTime(&temp, cudaStart, cudaStop);
-		milliseconds += temp;
+		bubble<<< block, thread >>>(d_N, d_s, d_tab);
 	}
 
+	cudaEventRecord(cudaStop);
+	cudaEventSynchronize(cudaStop);
+	cudaEventElapsedTime(&milliseconds, cudaStart, cudaStop);
+    cudaEventRecord(cudaStop);
 
 	cudaEventSynchronize(cudaStop);
-	//Poczekaæ na zakoñczenie wszystkiego
+	//Poczekam na zakoñczenie wszystkiego
 	cudaDeviceSynchronize();
+    cudaEventElapsedTime(&milliseconds, cudaStart, cudaStop);
 
 	cout << "GPU time: " << milliseconds << "ms" << endl;
 
@@ -181,30 +149,31 @@ int main(int argc, char* argv[])
 
 	cudaDeviceReset();
 
-//	for (int i : tabCPU) {
-//		std::cout << i << " ";
-//	}
-//	std::cout << std::endl;
-//
-//	for (int i : tabGPU) {
-//		std::cout << i << " ";
-//	}
-//	std::cout << std::endl;
-
 //	delete[] tabBase;
 //	delete[] tabCPU;
 //	delete[] tabGPU;
 
 	for (int i = 0; i < N; ++i) {
-
-//		cout << (i+1) << " - " << tabCPU[i] << "   :   " << tabGPU[i] << endl;
 		if (tabCPU[i] != tabGPU[i]) {
-			cout << "What a Terrible Failure" << endl;
-			break;
+			cout << "What a Terrible Failure! tabCPU[i] = "<< tabCPU[i] << " and tabGPU[i] = " << tabGPU[i] << " where i = " << i << endl;
+
+            cout << "tabBase ";
+            for (int i = 0; i < N; ++i) {
+                cout << tabBase[i] << " ";
+            }
+            cout << endl << "tabCPU ";
+            for (int i = 0; i < N; ++i) {
+                cout << tabCPU[i] << " ";
+            }
+            cout << endl << "tabGPU ";
+            for (int i = 0; i < N; ++i) {
+                cout << tabGPU[i] << " ";
+            }
+            cout << endl;
+            return 1;
 		}
 	}
 
-//	getchar();
 	return 0;
 }
 
