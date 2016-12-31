@@ -55,7 +55,7 @@ __global__ void KernelForces(unsigned int n, float deltaT, float* m, float3 *p,
 			v[ia].y += deltaT * f[ia].y;
 			v[ia].z += deltaT * f[ia].z;
 
-			printf("Update body %d velocity to %ld %ld %ld\n", ia, v[ia].x,
+			printf("Update body %d velocity to %lf %lf %lf\n", ia, v[ia].x,
 					v[ia].y, v[ia].z);
 		}
 	}
@@ -74,7 +74,7 @@ __global__ void KernelPositions(unsigned int n, float deltaT, float3 *p,
 			p[ia].y += deltaT * v[ia].y;
 			p[ia].z += deltaT * v[ia].z;
 
-			printf("Update body %d position to %ld %ld %ld\n", ia, p[ia].x,
+			printf("Update body %d position to %lf %lf %lf\n", ia, p[ia].x,
 					p[ia].y, p[ia].z);
 		}
 	}
@@ -89,7 +89,7 @@ float randomFloat(float a, float b) {
 
 int main(int argc, char* argv[]) {
 
-	const int n = 5, iterations = 1;
+	const int n = 15, iterations = 5;
 	float deltaT = 0.01;
 
 	float m[n];
