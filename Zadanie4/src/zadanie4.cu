@@ -1,6 +1,7 @@
 #include <iostream>
 #include <random>
 #include <ctime>
+#include <string>
 
 using namespace std;
 
@@ -54,9 +55,6 @@ __global__ void KernelForces(unsigned int n, float deltaT, float* m, float3 *p,
 			v[ia].x += deltaT * f[ia].x;
 			v[ia].y += deltaT * f[ia].y;
 			v[ia].z += deltaT * f[ia].z;
-
-			printf("Update body %d velocity to %lf %lf %lf\n", ia, v[ia].x,
-					v[ia].y, v[ia].z);
 		}
 	}
 }
@@ -73,9 +71,6 @@ __global__ void KernelPositions(unsigned int n, float deltaT, float3 *p,
 			p[ia].x += deltaT * v[ia].x;
 			p[ia].y += deltaT * v[ia].y;
 			p[ia].z += deltaT * v[ia].z;
-
-			printf("Update body %d position to %lf %lf %lf\n", ia, p[ia].x,
-					p[ia].y, p[ia].z);
 		}
 	}
 }
@@ -84,13 +79,17 @@ float randomFloat(float a, float b) {
 	float random = ((float) rand()) / (float) RAND_MAX;
 	float diff = b - a;
 	float r = random * diff;
-	return a + r;
+	return (a + r)+1.0f;
 }
 
 int main(int argc, char* argv[]) {
 
-	const int n = 15, iterations = 5;
-	float deltaT = 0.01;
+	string s(argv[1]);
+	string s2(argv[2]);
+	string s3(argv[3]);
+	string s4(argv[4]);
+	const int n = stoi(s)+1, iterations = stoi(s2), inHowMuchIterationsPrint = stoi(s4);
+	float deltaT = stof(s3);
 
 	float m[n];
 	float3 p[n], v[n], f[n];
@@ -109,8 +108,8 @@ int main(int argc, char* argv[]) {
 
 	for (int i = 0; i < n; ++i) {
 		m[i] = randomFloat(0, 5) + 0.01f;
-		p[i] = make_float3(randomFloat(-10, 10), randomFloat(-10, 10),
-				randomFloat(-10, 10));
+		p[i] = make_float3(randomFloat(-10, 10) + 0.1f, randomFloat(-10, 10) + 0.1f,
+				randomFloat(-10, 10) + 0.1f);
 		v[i] = make_float3(randomFloat(-2, 2), randomFloat(-2, 2),
 				randomFloat(-2, 2));
 		f[i] = make_float3(randomFloat(0, 0), randomFloat(0, 0),
@@ -147,10 +146,22 @@ int main(int argc, char* argv[]) {
 	cout << "Thread: " << thread.x << " " << thread.y << " " << thread.z
 			<< endl;
 
+	printf("Time: %lf s\n", deltaT);
+	for (int k = 1; k <= n; k++) {
+		printf("Body %d position: %lf %lf %lf\n", k, p[k].x, p[k].y, p[k].z);
+	}
+
 	for (int i = 1; i <= iterations; ++i) {
-		printf("Iteration %d\n", i);
+//		printf("Iteration %d\n", i);
 		KernelForces<<<block , thread>>> (n, deltaT, _m, _p, _v, _f);
 		KernelPositions<<<block , thread>>> (n, deltaT, _p, _v);
+		if (i % inHowMuchIterationsPrint == 0) {
+			printf ("Time: %lf s\n", deltaT*i);
+			checkCuda(cudaMemcpy(p, _p, float3VectorSize, cudaMemcpyDeviceToHost));
+			for (int k = 1; k < n; k++) {
+				printf("Body %d position: %lf %lf %lf\n", k, p[k].x, p[k].y, p[k].z);
+			}
+		}
 	}
 
 	cudaDeviceSynchronize();
