@@ -14,11 +14,10 @@ inline cudaError_t checkCuda(cudaError_t result) {
 
 __device__ float calcForce(float massJ, float distance, float g_const,
 		float b_const) {
-	if (distance == 0) {
-		return 0;
-	} else {
-		return b_const * (g_const * (massJ) / ((distance * distance)));
+	if (distance < 0.01) {
+        distance = 0.01;
 	}
+    return b_const * (g_const * (massJ) / ((distance * distance * distance)));
 }
 
 __global__ void KernelForces(unsigned int n, float deltaT, float* m, float3 *p,
@@ -79,17 +78,21 @@ float randomFloat(float a, float b) {
 	float random = ((float) rand()) / (float) RAND_MAX;
 	float diff = b - a;
 	float r = random * diff;
-	return (a + r)+1.0f;
+	return a + r;
 }
 
 int main(int argc, char* argv[]) {
-
 	string s(argv[1]);
 	string s2(argv[2]);
 	string s3(argv[3]);
 	string s4(argv[4]);
-	const int n = stoi(s)+1, iterations = stoi(s2), inHowMuchIterationsPrint = stoi(s4);
+	string s5(argv[5]);
+	string s6(argv[6]);
+	string s7(argv[7]);
+	string s8(argv[8]);
+	const int n = stoi(s), iterations = stoi(s2), inHowMuchIterationsPrint = stoi(s4);
 	float deltaT = stof(s3);
+	float massMin = stof(s5), massMax = stof(s6), initP = stof(s7), initV = stof(s8);
 
 	float m[n];
 	float3 p[n], v[n], f[n];
@@ -107,13 +110,15 @@ int main(int argc, char* argv[]) {
 	srand(time(NULL));
 
 	for (int i = 0; i < n; ++i) {
-		m[i] = randomFloat(0, 5) + 0.01f;
-		p[i] = make_float3(randomFloat(-10, 10) + 0.1f, randomFloat(-10, 10) + 0.1f,
-				randomFloat(-10, 10) + 0.1f);
-		v[i] = make_float3(randomFloat(-2, 2), randomFloat(-2, 2),
-				randomFloat(-2, 2));
-		f[i] = make_float3(randomFloat(0, 0), randomFloat(0, 0),
-				randomFloat(0, 0));
+		m[i] = randomFloat(massMin, massMax);
+		p[i] = make_float3(randomFloat(-initP, initP), 
+                           randomFloat(-initP, initP),
+                           randomFloat(-initP, initP));
+		//v[i] = make_float3(randomFloat(-2, 2), randomFloat(-2, 2), randomFloat(-2, 2));
+		v[i] = make_float3(randomFloat(-initV, initV),
+                           randomFloat(-initV, initV),
+                           randomFloat(-initV, initV));
+		f[i] = make_float3(randomFloat(0, 0), randomFloat(0, 0), randomFloat(0, 0));
 	}
 
 	int floatSize = sizeof(float);
@@ -146,8 +151,12 @@ int main(int argc, char* argv[]) {
 	cout << "Thread: " << thread.x << " " << thread.y << " " << thread.z
 			<< endl;
 
-	printf("Time: %lf s\n", deltaT);
-	for (int k = 1; k <= n; k++) {
+	for (int k = 0; k < n; k++) {
+        printf("Body %d mass: %lf\n", k, m[k]);
+    }
+
+	printf("Time: %lf s\n", 0.0);
+	for (int k = 0; k < n; k++) {
 		printf("Body %d position: %lf %lf %lf\n", k, p[k].x, p[k].y, p[k].z);
 	}
 
@@ -158,7 +167,7 @@ int main(int argc, char* argv[]) {
 		if (i % inHowMuchIterationsPrint == 0) {
 			printf ("Time: %lf s\n", deltaT*i);
 			checkCuda(cudaMemcpy(p, _p, float3VectorSize, cudaMemcpyDeviceToHost));
-			for (int k = 1; k < n; k++) {
+			for (int k = 0; k < n; k++) {
 				printf("Body %d position: %lf %lf %lf\n", k, p[k].x, p[k].y, p[k].z);
 			}
 		}
